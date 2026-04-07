@@ -1,0 +1,131 @@
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+.supervision-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.supervision-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 18px;
+}
+
+.supervision-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.supervision-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.supervision-subtitle {
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.supervision-meta {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: #334155;
+  margin-bottom: 12px;
+}
+
+.meta-label {
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.supervision-note {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  border-radius: 16px;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  margin-bottom: 12px;
+}
+
+.supervision-map-box {
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid #dbe2ea;
+  background: #fff;
+  margin-bottom: 12px;
+}
+
+.supervision-map {
+  width: 100%;
+  height: 200px;
+  border: 0;
+}
+
+.map-coords {
+  padding: 10px 12px;
+  border-top: 1px solid #eef2f7;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.view-photo-btn {
+  border: 0;
+  border-radius: 14px;
+  padding: 10px 14px;
+  background: #0f172a;
+  color: white;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.photo-preview-box {
+  min-height: 280px;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.photo-preview-img {
+  width: 100%;
+  max-height: 520px;
+  object-fit: cover;
+}
+
+.photo-center-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.photo-error-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: #b91c1c;
+  text-align: center;
+  padding: 20px;
+}
