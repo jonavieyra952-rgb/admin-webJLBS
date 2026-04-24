@@ -25,7 +25,7 @@ export function useAdminServices({
   const [newServiceResponsable, setNewServiceResponsable] = useState("");
   const [newServiceTelefono, setNewServiceTelefono] = useState("");
   const [newServiceGuardias, setNewServiceGuardias] = useState(1);
-  const [newServiceActivo, setNewServiceActivo] = useState(1);
+  const [newServiceTurnoId, setNewServiceTurnoId] = useState("");
 
   const [editingService, setEditingService] = useState<ServiceRow | null>(null);
   const [editServiceNombre, setEditServiceNombre] = useState("");
@@ -33,6 +33,7 @@ export function useAdminServices({
   const [editServiceResponsable, setEditServiceResponsable] = useState("");
   const [editServiceTelefono, setEditServiceTelefono] = useState("");
   const [editServiceGuardias, setEditServiceGuardias] = useState(1);
+  const [editServiceTurnoId, setEditServiceTurnoId] = useState("");
   const [editServiceActivo, setEditServiceActivo] = useState(1);
   const [editServiceFecha, setEditServiceFecha] = useState("");
 
@@ -64,6 +65,7 @@ export function useAdminServices({
     setCreatingService(true);
     setError("");
     setSuccess("");
+
     try {
       const response = await fetch(`${API_URL}/api/admin/services`, {
         method: "POST",
@@ -74,10 +76,12 @@ export function useAdminServices({
           responsable_cliente: newServiceResponsable,
           telefono_contacto: newServiceTelefono,
           guardias_requeridos: newServiceGuardias,
-          activo: newServiceActivo,
+          turno_id: newServiceTurnoId,
         }),
       });
+
       const data = await response.json().catch(() => ({}));
+
       if (!response.ok || !data.success) {
         throw new Error(data.error || `Error al crear servicio (${response.status})`);
       }
@@ -88,7 +92,7 @@ export function useAdminServices({
       setNewServiceResponsable("");
       setNewServiceTelefono("");
       setNewServiceGuardias(1);
-      setNewServiceActivo(1);
+      setNewServiceTurnoId("");
 
       await fetchServices();
       onSuccess?.();
@@ -106,6 +110,7 @@ export function useAdminServices({
     setEditServiceResponsable(service.responsable_cliente || "");
     setEditServiceTelefono(service.telefono_contacto || "");
     setEditServiceGuardias(service.guardias_requeridos || 1);
+    setEditServiceTurnoId(service.turno_id ? String(service.turno_id) : "");
     setEditServiceActivo(service.activo ?? 1);
     setEditServiceFecha(service.created_at ? String(service.created_at).slice(0, 10) : "");
     setError("");
@@ -119,6 +124,7 @@ export function useAdminServices({
     setEditServiceResponsable("");
     setEditServiceTelefono("");
     setEditServiceGuardias(1);
+    setEditServiceTurnoId("");
     setEditServiceActivo(1);
     setEditServiceFecha("");
   };
@@ -129,6 +135,7 @@ export function useAdminServices({
     setSavingServiceEdit(true);
     setError("");
     setSuccess("");
+
     try {
       const response = await fetch(`${API_URL}/api/admin/services/${editingService.id}`, {
         method: "PUT",
@@ -139,11 +146,14 @@ export function useAdminServices({
           responsable_cliente: editServiceResponsable,
           telefono_contacto: editServiceTelefono,
           guardias_requeridos: editServiceGuardias,
+          turno_id: editServiceTurnoId,
           activo: editServiceActivo,
           created_at: editServiceFecha,
         }),
       });
+
       const data = await response.json().catch(() => ({}));
+
       if (!response.ok || !data.success) {
         throw new Error(data.error || `Error al actualizar servicio (${response.status})`);
       }
@@ -161,13 +171,16 @@ export function useAdminServices({
   const handleToggleServiceStatus = async (serviceId: number, activo: number) => {
     setError("");
     setSuccess("");
+
     try {
       const response = await fetch(`${API_URL}/api/admin/services/${serviceId}/status`, {
         method: "PATCH",
         headers: authHeaders,
         body: JSON.stringify({ activo: activo ? 0 : 1 }),
       });
+
       const data = await response.json().catch(() => ({}));
+
       if (!response.ok || !data.success) {
         throw new Error(
           data.error || `Error al actualizar estado del servicio (${response.status})`
@@ -196,12 +209,15 @@ export function useAdminServices({
     setDeletingServiceId(serviceToDelete.id);
     setError("");
     setSuccess("");
+
     try {
       const response = await fetch(`${API_URL}/api/admin/services/${serviceToDelete.id}`, {
         method: "DELETE",
         headers: authHeaders,
       });
+
       const data = await response.json().catch(() => ({}));
+
       if (!response.ok || !data.success) {
         throw new Error(data.error || `Error al eliminar servicio (${response.status})`);
       }
@@ -233,8 +249,8 @@ export function useAdminServices({
     setNewServiceTelefono,
     newServiceGuardias,
     setNewServiceGuardias,
-    newServiceActivo,
-    setNewServiceActivo,
+    newServiceTurnoId,
+    setNewServiceTurnoId,
 
     editingService,
     editServiceNombre,
@@ -247,6 +263,8 @@ export function useAdminServices({
     setEditServiceTelefono,
     editServiceGuardias,
     setEditServiceGuardias,
+    editServiceTurnoId,
+    setEditServiceTurnoId,
     editServiceActivo,
     setEditServiceActivo,
     editServiceFecha,

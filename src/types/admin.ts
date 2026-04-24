@@ -1,20 +1,17 @@
-export type Shift = "Matutino" | "Nocturno";
+export type Shift = string;
 export type UserRole = "guard" | "supervisor" | "admin";
 
-export type UnidadAsignada =
-  | ""
-  | "Unidad 01"
-  | "Unidad 02"
-  | "Unidad 03"
-  | "Unidad 04"
-  | "Motocicleta 01";
+export type UnidadAsignada = string;
 
 export type AdminSection =
   | "usuarios"
   | "crear-usuario"
-  | "servicios"
   | "crear-servicio"
+  | "servicios"
+  | "unidades"
+  | "turnos"
   | "supervisiones"
+  | "supervision-schedule"
   | "inspecciones";
 
 export type AdminProfile = {
@@ -27,58 +24,73 @@ export type AdminUserRow = {
   id: number;
   nombre: string;
   email: string;
-  turno: Shift;
+  turno: string;
+  turno_id?: number | null;
   role: UserRole;
   activo: number;
-  verificado: number;
-  unidad_asignada?: string | null;
+  verificado?: number;
+  unidad_id?: number | null;
+  unidad_nombre?: string | null;
+  servicio_id?: number | null;
+  servicio_nombre?: string | null;
 };
 
 export type ServiceRow = {
   id: number;
   nombre: string;
-  direccion: string | null;
-  responsable_cliente: string | null;
-  telefono_contacto: string | null;
-  guardias_requeridos: number | null;
+  direccion?: string | null;
+  responsable_cliente?: string | null;
+  telefono_contacto?: string | null;
+  guardias_requeridos?: number | null;
+  turno?: string | null;
+  turno_id?: number | null;
   activo: number;
-  created_at?: string;
+  created_at?: string | null;
+};
+
+export type UnitRow = {
+  id: number;
+  nombre: string;
+  tipo?: string | null;
+  placa?: string | null;
+  descripcion?: string | null;
+  activa: number;
+  created_at?: string | null;
+};
+
+export type ShiftRow = {
+  id: number;
+  nombre: string;
+  descripcion?: string | null;
+  activo: number;
+  created_at?: string | null;
 };
 
 export type SupervisionRow = {
   id: number;
-  user_id: number;
-  supervisor_nombre: string;
-  servicio_id: number;
+  user_id?: number;
+  supervisor_nombre?: string;
+  servicio_id?: number;
   servicio_nombre: string;
-  turno: Shift;
-  novedades: string | null;
-  lat: number | null;
-  lng: number | null;
+  tipo: "IN" | "OUT";
+  turno?: string;
+  novedades?: string | null;
+  lat?: number | null;
+  lng?: number | null;
   foto_url: string;
-  fecha: string;
-  hora: string;
+  created_at?: string;
+  fecha?: string;
+  hora?: string;
 };
 
 export type UnitInspectionRow = {
   id: number;
-  user_id: number;
-  unidad: string;
-  turno: Shift;
-  servicio: string;
-  golpes_estado: string;
-  gasolina_nivel: string;
-  aceite_estado: string;
-  liquido_frenos_estado: string;
-  llantas_estado: string;
-  observaciones: string;
-  foto_url: string | null;
-  fecha: string;
-  hora: string;
-  creado_en?: string;
+  guardia_id?: number;
   guardia_nombre: string;
-  guardia_email: string;
+  unidad: string;
   hay_incidencia: number;
+  foto_url?: string | null;
+  created_at?: string | null;
 };
 
 export type UnitInspectionSummary = {

@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { ClipboardCheck, MapPinned, ShieldCheck, Users, PlusSquare, X } from "lucide-react";
+import {
+  ClipboardCheck,
+  MapPinned,
+  ShieldCheck,
+  Users,
+  PlusSquare,
+  X,
+  Pencil,
+  CalendarDays,
+} from "lucide-react";
 import "./App.css";
 
 import AdminCreateUserView from "./components/admin/AdminCreateUserView";
@@ -7,9 +16,12 @@ import AdminCreateServiceView from "./components/admin/AdminCreateServiceView";
 import AdminServicesTableView from "./components/admin/AdminServicesTableView";
 import AdminEditServiceModal from "./components/admin/AdminEditServiceModal";
 import AdminDeleteServiceModal from "./components/admin/AdminDeleteServiceModal";
+import AdminSupervisionsView from "./components/admin/AdminSupervisionsView";
+import AdminUnitsView from "./components/admin/AdminUnitsView";
+import AdminShiftsView from "./components/admin/AdminShiftsView";
+import SupervisorScheduleAdmin from "./components/SupervisorScheduleAdmin";
 
 import type {
-  Shift,
   UserRole,
   UnidadAsignada,
   AdminSection,
@@ -18,6 +30,8 @@ import type {
   SupervisionRow,
   UnitInspectionRow,
   UnitInspectionSummary,
+  UnitRow,
+  ShiftRow,
 } from "./types/admin";
 import { formatDateTime, formatOnlyDate } from "./utils/adminFormatters";
 import { useAdminServices } from "./hooks/useAdminServices";
@@ -25,14 +39,9 @@ import { useAdminServices } from "./hooks/useAdminServices";
 const jlbsLogo = "/jlbs-logo.jpeg";
 const API_URL = "http://localhost:3000";
 
-const UNIDADES_VALIDAS: UnidadAsignada[] = [
-  "",
-  "Unidad 01",
-  "Unidad 02",
-  "Unidad 03",
-  "Unidad 04",
-  "Motocicleta 01",
-];
+type UserViewRoleFilter = "all" | "guard" | "supervisor" | "admin";
+type UserShiftFilter = "all" | string;
+type UserStatusFilter = "all" | "active" | "inactive";
 
 function App() {
   const [adminEmail, setAdminEmail] = useState("");
@@ -51,12 +60,31 @@ function App() {
     ultima_inspeccion: null,
   });
 
+  const [units, setUnits] = useState<UnitRow[]>([]);
+  const [loadingUnits, setLoadingUnits] = useState(false);
+  const [creatingUnit, setCreatingUnit] = useState(false);
+  const [deletingUnitId, setDeletingUnitId] = useState<number | null>(null);
+
+  const [newUnitNombre, setNewUnitNombre] = useState("");
+  const [newUnitTipo, setNewUnitTipo] = useState("");
+  const [newUnitPlaca, setNewUnitPlaca] = useState("");
+  const [newUnitDescripcion, setNewUnitDescripcion] = useState("");
+
+  const [shifts, setShifts] = useState<ShiftRow[]>([]);
+  const [loadingShifts, setLoadingShifts] = useState(false);
+  const [creatingShift, setCreatingShift] = useState(false);
+  const [deletingShiftId, setDeletingShiftId] = useState<number | null>(null);
+
+  const [newShiftNombre, setNewShiftNombre] = useState("");
+  const [newShiftDescripcion, setNewShiftDescripcion] = useState("");
+
   const [loadingLogin, setLoadingLogin] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loadingSupervisions, setLoadingSupervisions] = useState(false);
   const [loadingUnitInspections, setLoadingUnitInspections] = useState(false);
   const [creatingUser, setCreatingUser] = useState(false);
   const [savingUnitAssignment, setSavingUnitAssignment] = useState<number | null>(null);
+  const [savingServiceAssignment, setSavingServiceAssignment] = useState<number | null>(null);
   const [savingTurno, setSavingTurno] = useState<number | null>(null);
 
   const [error, setError] = useState("");
@@ -65,8 +93,10 @@ function App() {
   const [newUserNombre, setNewUserNombre] = useState("");
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserPassword, setNewUserPassword] = useState("");
-  const [newUserTurno, setNewUserTurno] = useState<Shift>("Matutino");
+  const [newUserTurnoId, setNewUserTurnoId] = useState("");
   const [newUserRole, setNewUserRole] = useState<UserRole>("guard");
+  const [newUserUnidad, setNewUserUnidad] = useState<UnidadAsignada>("");
+  const [newUserServicio, setNewUserServicio] = useState("");
 
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [photoLoading, setPhotoLoading] = useState(false);
@@ -79,7 +109,21 @@ function App() {
   const [filterFechaDesde, setFilterFechaDesde] = useState("");
   const [filterFechaHasta, setFilterFechaHasta] = useState("");
   const [filterSoloIncidencias, setFilterSoloIncidencias] = useState(false);
+
   const [searchUsuario, setSearchUsuario] = useState("");
+  const [userRoleView, setUserRoleView] = useState<UserViewRoleFilter>("all");
+  const [userShiftFilter, setUserShiftFilter] = useState<UserShiftFilter>("all");
+  const [userStatusFilter, setUserStatusFilter] = useState<UserStatusFilter>("all");
+
+  const [editingUser, setEditingUser] = useState<AdminUserRow | null>(null);
+  const [savingUserEdit, setSavingUserEdit] = useState(false);
+  const [editUserNombre, setEditUserNombre] = useState("");
+  const [editUserEmail, setEditUserEmail] = useState("");
+  const [editUserTurnoId, setEditUserTurnoId] = useState("");
+  const [editUserRole, setEditUserRole] = useState<UserRole>("guard");
+  const [editUserUnidad, setEditUserUnidad] = useState<UnidadAsignada>("");
+  const [editUserServicio, setEditUserServicio] = useState("");
+  const [editUserActivo, setEditUserActivo] = useState<0 | 1>(1);
 
   const baseHeaders = useMemo(
     () => ({
@@ -95,6 +139,11 @@ function App() {
       Authorization: `Bearer ${adminToken}`,
     }),
     [baseHeaders, adminToken]
+  );
+
+  const activeShifts = useMemo(
+    () => shifts.filter((shift) => shift.activo === 1),
+    [shifts]
   );
 
   const {
@@ -114,8 +163,8 @@ function App() {
     setNewServiceTelefono,
     newServiceGuardias,
     setNewServiceGuardias,
-    newServiceActivo,
-    setNewServiceActivo,
+    newServiceTurnoId,
+    setNewServiceTurnoId,
 
     editingService,
     editServiceNombre,
@@ -128,6 +177,8 @@ function App() {
     setEditServiceTelefono,
     editServiceGuardias,
     setEditServiceGuardias,
+    editServiceTurnoId,
+    setEditServiceTurnoId,
     editServiceActivo,
     setEditServiceActivo,
     editServiceFecha,
@@ -155,6 +206,11 @@ function App() {
     setError,
     setSuccess,
   });
+
+  const activeServices = useMemo(
+    () => services.filter((service) => service.activo === 1),
+    [services]
+  );
 
   const moduleCards: {
     key: AdminSection;
@@ -192,11 +248,32 @@ function App() {
       icon: MapPinned,
     },
     {
+      key: "unidades",
+      label: "Unidades",
+      count: units.length,
+      desc: "Registra y administra las unidades disponibles del sistema",
+      icon: ShieldCheck,
+    },
+    {
+      key: "turnos",
+      label: "Turnos",
+      count: shifts.length,
+      desc: "Registra y administra los turnos disponibles del sistema",
+      icon: CalendarDays,
+    },
+    {
       key: "supervisiones",
       label: "Supervisiones",
       count: supervisions.length,
       desc: "Historial, ubicación, novedades y evidencia",
       icon: ClipboardCheck,
+    },
+    {
+      key: "supervision-schedule",
+      label: "Calendario de supervisiones",
+      count: 0,
+      desc: "Programa fecha, hora y lugar del servicio para supervisores",
+      icon: CalendarDays,
     },
     {
       key: "inspecciones",
@@ -238,6 +315,218 @@ function App() {
       setError(err?.message || "No se pudo cargar la lista de usuarios.");
     } finally {
       setLoadingUsers(false);
+    }
+  };
+
+  const fetchUnits = async () => {
+    if (!adminToken) return;
+    setLoadingUnits(true);
+    try {
+      const response = await fetch(`${API_URL}/api/admin/units`, {
+        headers: authHeaders,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) {
+        setUnits([]);
+        return;
+      }
+      setUnits(data.units || []);
+    } catch {
+      setUnits([]);
+    } finally {
+      setLoadingUnits(false);
+    }
+  };
+
+  const fetchShifts = async () => {
+    if (!adminToken) return;
+    setLoadingShifts(true);
+    try {
+      const response = await fetch(`${API_URL}/api/admin/shifts`, {
+        headers: authHeaders,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) {
+        setShifts([]);
+        return;
+      }
+      setShifts(data.shifts || []);
+    } catch {
+      setShifts([]);
+    } finally {
+      setLoadingShifts(false);
+    }
+  };
+
+  const handleCreateUnit = async () => {
+    setCreatingUnit(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch(`${API_URL}/api/admin/units`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({
+          nombre: newUnitNombre,
+          tipo: newUnitTipo,
+          placa: newUnitPlaca,
+          descripcion: newUnitDescripcion,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || `Error al crear unidad (${response.status})`);
+      }
+
+      setSuccess("Unidad creada correctamente.");
+      setNewUnitNombre("");
+      setNewUnitTipo("");
+      setNewUnitPlaca("");
+      setNewUnitDescripcion("");
+
+      await fetchUnits();
+    } catch (err: any) {
+      setError(err?.message || "No se pudo crear la unidad.");
+    } finally {
+      setCreatingUnit(false);
+    }
+  };
+
+  const handleCreateShift = async () => {
+    setCreatingShift(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch(`${API_URL}/api/admin/shifts`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({
+          nombre: newShiftNombre,
+          descripcion: newShiftDescripcion,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || `Error al crear turno (${response.status})`);
+      }
+
+      setSuccess("Turno creado correctamente.");
+      setNewShiftNombre("");
+      setNewShiftDescripcion("");
+
+      await fetchShifts();
+    } catch (err: any) {
+      setError(err?.message || "No se pudo crear el turno.");
+    } finally {
+      setCreatingShift(false);
+    }
+  };
+
+  const handleToggleUnitStatus = async (unitId: number, activa: number) => {
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch(`${API_URL}/api/admin/units/${unitId}/status`, {
+        method: "PATCH",
+        headers: authHeaders,
+        body: JSON.stringify({ activa: activa ? 0 : 1 }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || `Error al actualizar unidad (${response.status})`);
+      }
+
+      setSuccess(activa ? "Unidad desactivada." : "Unidad activada.");
+      await fetchUnits();
+      await fetchUsers();
+    } catch (err: any) {
+      setError(err?.message || "No se pudo actualizar el estado de la unidad.");
+    }
+  };
+
+  const handleToggleShiftStatus = async (shiftId: number, activo: number) => {
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch(`${API_URL}/api/admin/shifts/${shiftId}/status`, {
+        method: "PATCH",
+        headers: authHeaders,
+        body: JSON.stringify({ activo: activo ? 0 : 1 }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || `Error al actualizar turno (${response.status})`);
+      }
+
+      setSuccess(activo ? "Turno desactivado." : "Turno activado.");
+      await fetchShifts();
+    } catch (err: any) {
+      setError(err?.message || "No se pudo actualizar el estado del turno.");
+    }
+  };
+
+  const handleDeleteUnit = async (unitId: number) => {
+    setDeletingUnitId(unitId);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch(`${API_URL}/api/admin/units/${unitId}`, {
+        method: "DELETE",
+        headers: authHeaders,
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || `Error al eliminar unidad (${response.status})`);
+      }
+
+      setSuccess("Unidad eliminada correctamente.");
+      await fetchUnits();
+      await fetchUsers();
+    } catch (err: any) {
+      setError(err?.message || "No se pudo eliminar la unidad.");
+    } finally {
+      setDeletingUnitId(null);
+    }
+  };
+
+  const handleDeleteShift = async (shiftId: number) => {
+    setDeletingShiftId(shiftId);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch(`${API_URL}/api/admin/shifts/${shiftId}`, {
+        method: "DELETE",
+        headers: authHeaders,
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || `Error al eliminar turno (${response.status})`);
+      }
+
+      setSuccess("Turno eliminado correctamente.");
+      await fetchShifts();
+    } catch (err: any) {
+      setError(err?.message || "No se pudo eliminar el turno.");
+    } finally {
+      setDeletingShiftId(null);
     }
   };
 
@@ -317,6 +606,8 @@ function App() {
       const bootstrapPanel = async () => {
         await Promise.allSettled([
           fetchUsers(),
+          fetchUnits(),
+          fetchShifts(),
           fetchServices(),
           fetchSupervisions(),
           fetchUnitInspectionSummary(),
@@ -386,6 +677,8 @@ function App() {
     setAdminToken("");
     setAdminProfile(null);
     setAdminUsers([]);
+    setUnits([]);
+    setShifts([]);
     setSupervisions([]);
     setUnitInspections([]);
     setAdminEmail("");
@@ -407,8 +700,13 @@ function App() {
           nombre: newUserNombre,
           email: newUserEmail,
           password: newUserPassword,
-          turno: newUserTurno,
+          turno_id: newUserTurnoId,
           role: newUserRole,
+          unidad_id:
+            newUserRole === "guard" || newUserRole === "supervisor"
+              ? newUserUnidad
+              : "",
+          servicio_id: newUserRole === "guard" ? newUserServicio : "",
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -419,8 +717,10 @@ function App() {
       setNewUserNombre("");
       setNewUserEmail("");
       setNewUserPassword("");
-      setNewUserTurno("Matutino");
+      setNewUserTurnoId("");
       setNewUserRole("guard");
+      setNewUserUnidad("");
+      setNewUserServicio("");
       await fetchUsers();
       setCurrentSection("usuarios");
     } catch (err: any) {
@@ -450,7 +750,7 @@ function App() {
     }
   };
 
-  const handleAssignUnit = async (userId: number, unidad_asignada: UnidadAsignada) => {
+  const handleAssignUnit = async (userId: number, unidad_id: string) => {
     setSavingUnitAssignment(userId);
     setError("");
     setSuccess("");
@@ -458,14 +758,14 @@ function App() {
       const response = await fetch(`${API_URL}/api/admin/users/${userId}/assigned-unit`, {
         method: "PATCH",
         headers: authHeaders,
-        body: JSON.stringify({ unidad_asignada }),
+        body: JSON.stringify({ unidad_id }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.success) {
         throw new Error(data.error || `Error al asignar unidad (${response.status})`);
       }
       setSuccess(
-        unidad_asignada
+        unidad_id
           ? "Unidad asignada correctamente."
           : "Unidad desasignada correctamente."
       );
@@ -477,7 +777,30 @@ function App() {
     }
   };
 
-  const handleChangeTurno = async (userId: number, nuevoTurno: Shift) => {
+  const handleAssignService = async (userId: number, servicio_id: string) => {
+    setSavingServiceAssignment(userId);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch(`${API_URL}/api/admin/users/${userId}/assigned-service`, {
+        method: "PATCH",
+        headers: authHeaders,
+        body: JSON.stringify({ servicio_id }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || `Error al asignar servicio (${response.status})`);
+      }
+      setSuccess("Servicio asignado correctamente.");
+      await fetchUsers();
+    } catch (err: any) {
+      setError(err?.message || "No se pudo actualizar el servicio asignado.");
+    } finally {
+      setSavingServiceAssignment(null);
+    }
+  };
+
+  const handleChangeTurno = async (userId: number, turno_id: string) => {
     setSavingTurno(userId);
     setError("");
     setSuccess("");
@@ -485,7 +808,7 @@ function App() {
       const response = await fetch(`${API_URL}/api/admin/users/${userId}/shift`, {
         method: "PATCH",
         headers: authHeaders,
-        body: JSON.stringify({ turno: nuevoTurno }),
+        body: JSON.stringify({ turno_id }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.success) {
@@ -497,6 +820,70 @@ function App() {
       setError(err?.message || "No se pudo actualizar el turno.");
     } finally {
       setSavingTurno(null);
+    }
+  };
+
+  const openEditUser = (user: AdminUserRow) => {
+    setEditingUser(user);
+    setEditUserNombre(user.nombre || "");
+    setEditUserEmail(user.email || "");
+    setEditUserTurnoId(user.turno_id ? String(user.turno_id) : "");
+    setEditUserRole(user.role || "guard");
+    setEditUserUnidad(user.unidad_id ? String(user.unidad_id) : "");
+    setEditUserServicio(user.servicio_id ? String(user.servicio_id) : "");
+    setEditUserActivo(user.activo === 1 ? 1 : 0);
+  };
+
+  const closeEditUser = () => {
+    setEditingUser(null);
+    setEditUserNombre("");
+    setEditUserEmail("");
+    setEditUserTurnoId("");
+    setEditUserRole("guard");
+    setEditUserUnidad("");
+    setEditUserServicio("");
+    setEditUserActivo(1);
+    setSavingUserEdit(false);
+  };
+
+  const handleSaveUserEdit = async () => {
+    if (!editingUser) return;
+
+    setSavingUserEdit(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await fetch(`${API_URL}/api/admin/users/${editingUser.id}`, {
+        method: "PATCH",
+        headers: authHeaders,
+        body: JSON.stringify({
+          nombre: editUserNombre,
+          email: editUserEmail,
+          turno_id: editUserTurnoId,
+          role: editUserRole,
+          unidad_id:
+            editUserRole === "guard" || editUserRole === "supervisor"
+              ? editUserUnidad
+              : "",
+          servicio_id: editUserRole === "guard" ? editUserServicio : "",
+          activo: editUserActivo,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || `Error al actualizar usuario (${response.status})`);
+      }
+
+      setSuccess("Usuario actualizado correctamente.");
+      closeEditUser();
+      await fetchUsers();
+    } catch (err: any) {
+      setError(err?.message || "No se pudo actualizar el usuario.");
+    } finally {
+      setSavingUserEdit(false);
     }
   };
 
@@ -560,27 +947,78 @@ function App() {
   const latestInspectionDt = formatDateTime(inspectionSummary.ultima_inspeccion);
 
   const renderUsuarios = () => {
+    const totalUsuarios = adminUsers.length;
+    const totalGuardias = adminUsers.filter((u) => u.role === "guard").length;
+    const totalSupervisores = adminUsers.filter((u) => u.role === "supervisor").length;
+    const totalAdmins = adminUsers.filter((u) => u.role === "admin").length;
+
     const usuariosFiltrados = adminUsers.filter((u) => {
-      const q = searchUsuario.toLowerCase();
-      return (
+      const q = searchUsuario.trim().toLowerCase();
+
+      const matchesSearch =
+        !q ||
         u.nombre.toLowerCase().includes(q) ||
         u.email.toLowerCase().includes(q) ||
         u.role.toLowerCase().includes(q) ||
-        (u.unidad_asignada || "").toLowerCase().includes(q)
-      );
+        (u.turno || "").toLowerCase().includes(q) ||
+        (u.unidad_nombre || "").toLowerCase().includes(q) ||
+        (u.servicio_nombre || "").toLowerCase().includes(q);
+
+      const matchesRole = userRoleView === "all" ? true : u.role === userRoleView;
+      const matchesShift = userShiftFilter === "all" ? true : u.turno === userShiftFilter;
+      const matchesStatus =
+        userStatusFilter === "all"
+          ? true
+          : userStatusFilter === "active"
+          ? u.activo === 1
+          : u.activo !== 1;
+
+      return matchesSearch && matchesRole && matchesShift && matchesStatus;
     });
+
+    const roleTabs = [
+      { key: "all" as UserViewRoleFilter, label: "Todos", count: totalUsuarios },
+      { key: "guard" as UserViewRoleFilter, label: "Guardias", count: totalGuardias },
+      {
+        key: "supervisor" as UserViewRoleFilter,
+        label: "Supervisores",
+        count: totalSupervisores,
+      },
+      { key: "admin" as UserViewRoleFilter, label: "Admins", count: totalAdmins },
+    ];
 
     return (
       <div className="row g-4">
         <div className="col-12">
           <section className="card admin-card border-0 shadow-sm">
             <div className="card-body p-4">
-              <div className="usuarios-header mb-4">
-                <div>
-                  <h2 className="h4 mb-1">Usuarios registrados</h2>
+              <div className="usuarios-hero mb-4">
+                <div className="usuarios-hero__copy">
+                  <span className="section-kicker">Gestión de usuarios</span>
+                  <h2 className="usuarios-hero__title">Usuarios registrados</h2>
+                  <p className="usuarios-hero__subtitle">
+                    Organiza guardias, supervisores y administradores desde una sola vista.
+                  </p>
                 </div>
-                <div className="usuarios-header__right">
-                  <div className="usuarios-search-box">
+              </div>
+
+              <div className="usuarios-toolbar mb-4">
+                <div className="usuarios-tabs" role="tablist" aria-label="Filtrar por rol">
+                  {roleTabs.map((tab) => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      className={`usuarios-tab ${userRoleView === tab.key ? "is-active" : ""}`}
+                      onClick={() => setUserRoleView(tab.key)}
+                    >
+                      <span>{tab.label}</span>
+                      <small>{tab.count}</small>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="usuarios-toolbar__filters">
+                  <div className="usuarios-search-box usuarios-search-box--wide">
                     <svg
                       className="usuarios-search-icon"
                       xmlns="http://www.w3.org/2000/svg"
@@ -596,15 +1034,18 @@ function App() {
                       <circle cx="11" cy="11" r="8" />
                       <line x1="21" y1="21" x2="16.65" y2="16.65" />
                     </svg>
+
                     <input
                       className="usuarios-search-input"
                       type="text"
-                      placeholder="Buscar por nombre, correo, rol..."
+                      placeholder="Buscar por nombre, correo, rol, turno, unidad o servicio..."
                       value={searchUsuario}
                       onChange={(e) => setSearchUsuario(e.target.value)}
                     />
+
                     {searchUsuario && (
                       <button
+                        type="button"
                         className="usuarios-search-clear"
                         onClick={() => setSearchUsuario("")}
                       >
@@ -612,10 +1053,78 @@ function App() {
                       </button>
                     )}
                   </div>
-                  <div className="stat-chip">
-                    {usuariosFiltrados.length} de <strong>{adminUsers.length}</strong> usuarios
-                  </div>
+
+                  <select
+                    className="form-select admin-input usuarios-filter-select"
+                    value={userShiftFilter}
+                    onChange={(e) => setUserShiftFilter(e.target.value)}
+                  >
+                    <option value="all">Todos los turnos</option>
+                    {activeShifts.map((shift) => (
+                      <option key={`filter-shift-${shift.id}`} value={shift.nombre}>
+                        {shift.nombre}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    className="form-select admin-input usuarios-filter-select"
+                    value={userStatusFilter}
+                    onChange={(e) => setUserStatusFilter(e.target.value as UserStatusFilter)}
+                  >
+                    <option value="all">Todos los estados</option>
+                    <option value="active">Activos</option>
+                    <option value="inactive">Inactivos</option>
+                  </select>
                 </div>
+              </div>
+
+              <div className="usuarios-active-filters mb-3">
+                <span className="usuarios-filter-badge">
+                  Rol:{" "}
+                  <strong>
+                    {userRoleView === "all"
+                      ? "Todos"
+                      : userRoleView === "guard"
+                      ? "Guardias"
+                      : userRoleView === "supervisor"
+                      ? "Supervisores"
+                      : "Admins"}
+                  </strong>
+                </span>
+
+                <span className="usuarios-filter-badge">
+                  Turno: <strong>{userShiftFilter === "all" ? "Todos" : userShiftFilter}</strong>
+                </span>
+
+                <span className="usuarios-filter-badge">
+                  Estado:{" "}
+                  <strong>
+                    {userStatusFilter === "all"
+                      ? "Todos"
+                      : userStatusFilter === "active"
+                      ? "Activos"
+                      : "Inactivos"}
+                  </strong>
+                </span>
+
+                {(searchUsuario ||
+                  userRoleView !== "all" ||
+                  userShiftFilter !== "all" ||
+                  userStatusFilter !== "all") && (
+                  <button
+                    type="button"
+                    className="usuarios-clear-filters"
+                    onClick={() => {
+                      setSearchUsuario("");
+                      setUserRoleView("all");
+                      setUserShiftFilter("all");
+                      setUserStatusFilter("all");
+                    }}
+                  >
+                    Limpiar filtros
+                  </button>
+                )}
               </div>
 
               <div className="table-responsive admin-table-wrap">
@@ -623,40 +1132,57 @@ function App() {
                   <thead>
                     <tr>
                       <th>ID</th>
-                      <th>Nombre</th>
+                      <th>Usuario</th>
                       <th>Correo</th>
                       <th>Turno</th>
                       <th>Rol</th>
+                      <th>Servicio asignado</th>
                       <th>Unidad asignada</th>
                       <th>Estado</th>
                       <th>Acciones</th>
                     </tr>
                   </thead>
+
                   <tbody>
                     {usuariosFiltrados.length > 0 ? (
                       usuariosFiltrados.map((u) => (
                         <tr key={u.id}>
                           <td className="text-muted table-col-id">#{u.id}</td>
-                          <td className="table-col-nombre" style={{ fontWeight: 600 }}>
-                            {u.nombre}
+
+                          <td className="table-col-nombre">
+                            <div className="usuario-main-cell">
+                              <strong>{u.nombre}</strong>
+                              <span>
+                                {u.role === "guard"
+                                  ? "Guardia"
+                                  : u.role === "supervisor"
+                                  ? "Supervisor"
+                                  : "Administrador"}
+                              </span>
+                            </div>
                           </td>
-                          <td
-                            className="table-col-email"
-                            style={{ color: "var(--admin-text-secondary)" }}
-                          >
-                            {u.email}
-                          </td>
+
+                          <td className="table-col-email usuario-email-cell">{u.email}</td>
+
                           <td className="table-col-turno">
                             <select
                               className="form-select form-select-sm admin-input usuarios-unit-select"
-                              value={u.turno}
-                              onChange={(e) => handleChangeTurno(u.id, e.target.value as Shift)}
+                              value={u.turno_id ? String(u.turno_id) : ""}
+                              onChange={(e) => handleChangeTurno(u.id, e.target.value)}
                               disabled={savingTurno === u.id}
                             >
-                              <option value="Matutino">Matutino</option>
-                              <option value="Nocturno">Nocturno</option>
+                              <option value="">Selecciona un turno</option>
+                              {activeShifts.map((shift) => (
+                                <option
+                                  key={`user-shift-${u.id}-${shift.id}`}
+                                  value={String(shift.id)}
+                                >
+                                  {shift.nombre}
+                                </option>
+                              ))}
                             </select>
                           </td>
+
                           <td className="table-col-rol">
                             <span className={`pill role ${u.role}`}>
                               {u.role === "guard"
@@ -666,22 +1192,19 @@ function App() {
                                 : "Admin"}
                             </span>
                           </td>
-                          <td className="table-col-unidad">
+
+                          <td className="table-col-servicio">
                             {u.role === "guard" ? (
                               <select
                                 className="form-select form-select-sm admin-input usuarios-unit-select"
-                                value={u.unidad_asignada || ""}
-                                onChange={(e) =>
-                                  handleAssignUnit(u.id, e.target.value as UnidadAsignada)
-                                }
-                                disabled={savingUnitAssignment === u.id}
+                                value={u.servicio_id ? String(u.servicio_id) : ""}
+                                onChange={(e) => handleAssignService(u.id, e.target.value)}
+                                disabled={savingServiceAssignment === u.id}
                               >
-                                {UNIDADES_VALIDAS.map((unidad) => (
-                                  <option
-                                    key={`${u.id}-${unidad || "sin-unidad"}`}
-                                    value={unidad}
-                                  >
-                                    {unidad || "Sin unidad"}
+                                <option value="">Selecciona un servicio</option>
+                                {activeServices.map((service) => (
+                                  <option key={`${u.id}-service-${service.id}`} value={String(service.id)}>
+                                    {service.nombre}
                                   </option>
                                 ))}
                               </select>
@@ -689,28 +1212,63 @@ function App() {
                               <span className="text-muted table-no-aplica">No aplica</span>
                             )}
                           </td>
+
+                          <td className="table-col-unidad">
+                            {u.role === "guard" || u.role === "supervisor" ? (
+                              <select
+                                className="form-select form-select-sm admin-input usuarios-unit-select"
+                                value={u.unidad_id ? String(u.unidad_id) : ""}
+                                onChange={(e) => handleAssignUnit(u.id, e.target.value)}
+                                disabled={savingUnitAssignment === u.id}
+                              >
+                                <option value="">Sin unidad</option>
+                                {units
+                                  .filter((unidad) => unidad.activa === 1)
+                                  .map((unidad) => (
+                                    <option key={`${u.id}-${unidad.id}`} value={String(unidad.id)}>
+                                      {unidad.nombre}
+                                    </option>
+                                  ))}
+                              </select>
+                            ) : (
+                              <span className="text-muted table-no-aplica">No aplica</span>
+                            )}
+                          </td>
+
                           <td className="table-col-estado">
                             <span className={`pill ${u.activo === 1 ? "active" : "inactive"}`}>
                               {u.activo === 1 ? "Activo" : "Inactivo"}
                             </span>
                           </td>
+
                           <td className="table-col-acciones">
-                            <button
-                              className={`btn-toggle-status ${
-                                u.activo === 1
-                                  ? "btn-toggle-status--desactivar"
-                                  : "btn-toggle-status--activar"
-                              }`}
-                              onClick={() => handleToggleStatus(u.id, u.activo)}
-                            >
-                              {u.activo === 1 ? "Desactivar" : "Activar"}
-                            </button>
+                            <div className="usuarios-actions-cell">
+                              <button
+                                type="button"
+                                className="btn-edit-user"
+                                onClick={() => openEditUser(u)}
+                              >
+                                <Pencil size={14} />
+                                Editar
+                              </button>
+
+                              <button
+                                className={`btn-toggle-status ${
+                                  u.activo === 1
+                                    ? "btn-toggle-status--desactivar"
+                                    : "btn-toggle-status--activar"
+                                }`}
+                                onClick={() => handleToggleStatus(u.id, u.activo)}
+                              >
+                                {u.activo === 1 ? "Desactivar" : "Activar"}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={8} className="empty-cell">
+                        <td colSpan={9} className="empty-cell">
                           {loadingUsers ? "Cargando usuarios..." : "Sin resultados."}
                         </td>
                       </tr>
@@ -733,12 +1291,19 @@ function App() {
       setNewUserEmail={setNewUserEmail}
       newUserPassword={newUserPassword}
       setNewUserPassword={setNewUserPassword}
-      newUserTurno={newUserTurno}
-      setNewUserTurno={setNewUserTurno}
+      newUserTurnoId={newUserTurnoId}
+      setNewUserTurnoId={setNewUserTurnoId}
       newUserRole={newUserRole}
       setNewUserRole={setNewUserRole}
+      newUserUnidad={newUserUnidad}
+      setNewUserUnidad={setNewUserUnidad}
+      newUserServicio={newUserServicio}
+      setNewUserServicio={setNewUserServicio}
       creatingUser={creatingUser}
       handleCreateUser={handleCreateUser}
+      shifts={activeShifts}
+      units={units.filter((unidad) => unidad.activa === 1)}
+      services={activeServices}
     />
   );
 
@@ -754,10 +1319,11 @@ function App() {
       setNewServiceTelefono={setNewServiceTelefono}
       newServiceGuardias={newServiceGuardias}
       setNewServiceGuardias={setNewServiceGuardias}
-      newServiceActivo={newServiceActivo}
-      setNewServiceActivo={setNewServiceActivo}
+      newServiceTurnoId={newServiceTurnoId}
+      setNewServiceTurnoId={setNewServiceTurnoId}
       creatingService={creatingService}
       handleCreateService={() => handleCreateService(() => setCurrentSection("servicios"))}
+      shifts={activeShifts}
     />
   );
 
@@ -777,36 +1343,53 @@ function App() {
     />
   );
 
+  const renderUnidades = () => (
+    <AdminUnitsView
+      units={units}
+      loadingUnits={loadingUnits}
+      creatingUnit={creatingUnit}
+      newUnitNombre={newUnitNombre}
+      setNewUnitNombre={setNewUnitNombre}
+      newUnitTipo={newUnitTipo}
+      setNewUnitTipo={setNewUnitTipo}
+      newUnitPlaca={newUnitPlaca}
+      setNewUnitPlaca={setNewUnitPlaca}
+      newUnitDescripcion={newUnitDescripcion}
+      setNewUnitDescripcion={setNewUnitDescripcion}
+      handleCreateUnit={handleCreateUnit}
+      handleToggleUnitStatus={handleToggleUnitStatus}
+      handleDeleteUnit={handleDeleteUnit}
+      deletingUnitId={deletingUnitId}
+    />
+  );
+
+  const renderTurnos = () => (
+    <AdminShiftsView
+      shifts={shifts}
+      loadingShifts={loadingShifts}
+      creatingShift={creatingShift}
+      newShiftNombre={newShiftNombre}
+      setNewShiftNombre={setNewShiftNombre}
+      newShiftDescripcion={newShiftDescripcion}
+      setNewShiftDescripcion={setNewShiftDescripcion}
+      handleCreateShift={handleCreateShift}
+      handleToggleShiftStatus={handleToggleShiftStatus}
+      handleDeleteShift={handleDeleteShift}
+      deletingShiftId={deletingShiftId}
+    />
+  );
+
   const renderSupervisiones = () => (
-    <div className="row g-4">
-      {supervisions.map((item) => (
-        <div key={item.id} className="col-12 col-lg-6">
-          <div className="card supervision-bs-card h-100 border-0 shadow-sm">
-            <div className="card-body p-4">
-              <div className="d-flex justify-content-between mb-3">
-                <h3 className="h5 mb-0">{item.servicio_nombre}</h3>
-                <span className="pill role supervisor">{item.turno}</span>
-              </div>
-              <div className="meta-list mb-3">
-                <div><strong>Supervisor:</strong> {item.supervisor_nombre}</div>
-                <div><strong>Fecha:</strong> {formatDateTime(item.hora).date}</div>
-              </div>
-              {item.novedades && (
-                <div className="alert alert-warning py-2 admin-note">{item.novedades}</div>
-              )}
-              {item.foto_url && (
-                <button
-                  className="btn btn-admin-dark w-100 mt-2"
-                  onClick={() => openSupervisionPhotoModal(item)}
-                >
-                  Ver foto
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
+    <AdminSupervisionsView
+      supervisions={supervisions}
+      loadingSupervisions={loadingSupervisions}
+      formatDateTime={formatDateTime}
+      openSupervisionPhotoModal={openSupervisionPhotoModal}
+    />
+  );
+
+  const renderSupervisionSchedule = () => (
+    <SupervisorScheduleAdmin apiUrl={API_URL} adminToken={adminToken} />
   );
 
   const renderInspecciones = () => (
@@ -835,6 +1418,7 @@ function App() {
                 </div>
               </div>
             </div>
+
             <div className="table-responsive admin-table-wrap">
               <table className="table align-middle admin-table">
                 <thead>
@@ -871,6 +1455,15 @@ function App() {
                       </td>
                     </tr>
                   ))}
+                  {unitInspections.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="empty-cell">
+                        {loadingUnitInspections
+                          ? "Cargando inspecciones..."
+                          : "No hay inspecciones registradas."}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -917,8 +1510,14 @@ function App() {
         return renderCrearServicio();
       case "servicios":
         return renderServicios();
+      case "unidades":
+        return renderUnidades();
+      case "turnos":
+        return renderTurnos();
       case "supervisiones":
         return renderSupervisiones();
+      case "supervision-schedule":
+        return renderSupervisionSchedule();
       case "inspecciones":
         return renderInspecciones();
       default:
@@ -1003,6 +1602,159 @@ function App() {
         </div>
       )}
 
+      {editingUser && (
+        <div className="modal-backdrop" onClick={closeEditUser}>
+          <div
+            className="modal-card modal-card--user-edit"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button className="modal-close-btn" onClick={closeEditUser} aria-label="Cerrar">
+              <X size={20} />
+            </button>
+
+            <h2>Editar usuario</h2>
+            <p className="modal-subtitle">
+              Actualiza la información general, el rol, el turno, el servicio y el estado del usuario.
+            </p>
+
+            <div className="modal-scroll-body">
+              <div className="row g-3">
+                <div className="col-12">
+                  <label className="form-label admin-label">Nombre completo</label>
+                  <input
+                    className="form-control admin-input"
+                    type="text"
+                    value={editUserNombre}
+                    onChange={(e) => setEditUserNombre(e.target.value)}
+                    placeholder="Ej. Juan Carlos Pérez López"
+                  />
+                </div>
+
+                <div className="col-12">
+                  <label className="form-label admin-label">Correo</label>
+                  <input
+                    className="form-control admin-input"
+                    type="email"
+                    value={editUserEmail}
+                    onChange={(e) => setEditUserEmail(e.target.value)}
+                    placeholder="correo@empresa.com"
+                  />
+                </div>
+
+                <div className="col-12 col-md-6">
+                  <label className="form-label admin-label">Turno</label>
+                  <select
+                    className="form-select admin-input"
+                    value={editUserTurnoId}
+                    onChange={(e) => setEditUserTurnoId(e.target.value)}
+                  >
+                    <option value="">Selecciona un turno</option>
+                    {activeShifts.map((shift) => (
+                      <option key={`edit-shift-${shift.id}`} value={String(shift.id)}>
+                        {shift.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="col-12 col-md-6">
+                  <label className="form-label admin-label">Rol</label>
+                  <select
+                    className="form-select admin-input"
+                    value={editUserRole}
+                    onChange={(e) => setEditUserRole(e.target.value as UserRole)}
+                  >
+                    <option value="guard">Guardia</option>
+                    <option value="supervisor">Supervisor</option>
+                    <option value="admin">Administrador</option>
+                  </select>
+                </div>
+
+                <div className="col-12 col-md-6">
+                  <label className="form-label admin-label">Servicio asignado</label>
+                  <select
+                    className="form-select admin-input"
+                    value={editUserRole === "guard" ? editUserServicio : ""}
+                    onChange={(e) => setEditUserServicio(e.target.value)}
+                    disabled={editUserRole !== "guard"}
+                  >
+                    <option value="">Selecciona un servicio</option>
+                    {activeServices.map((service) => (
+                      <option key={`edit-user-service-${service.id}`} value={String(service.id)}>
+                        {service.nombre}
+                      </option>
+                    ))}
+                  </select>
+                  {editUserRole === "guard" && (
+                    <div className="muted-small">
+                      El servicio es obligatorio para los guardias.
+                    </div>
+                  )}
+                  {editUserRole !== "guard" && (
+                    <div className="muted-small">
+                      Solo los guardias pueden tener servicio asignado.
+                    </div>
+                  )}
+                </div>
+
+                <div className="col-12 col-md-6">
+                  <label className="form-label admin-label">Estado</label>
+                  <select
+                    className="form-select admin-input"
+                    value={String(editUserActivo)}
+                    onChange={(e) => setEditUserActivo(Number(e.target.value) === 1 ? 1 : 0)}
+                  >
+                    <option value="1">Activo</option>
+                    <option value="0">Inactivo</option>
+                  </select>
+                </div>
+
+                <div className="col-12 col-md-6">
+                  <label className="form-label admin-label">Unidad asignada</label>
+                  <select
+                    className="form-select admin-input"
+                    value={
+                      editUserRole === "guard" || editUserRole === "supervisor"
+                        ? editUserUnidad
+                        : ""
+                    }
+                    onChange={(e) => setEditUserUnidad(e.target.value)}
+                    disabled={editUserRole === "admin"}
+                  >
+                    <option value="">Sin unidad</option>
+                    {units
+                      .filter((unidad) => unidad.activa === 1)
+                      .map((unidad) => (
+                        <option key={`edit-user-unit-${unidad.id}`} value={String(unidad.id)}>
+                          {unidad.nombre}
+                        </option>
+                      ))}
+                  </select>
+                  {editUserRole === "admin" && (
+                    <div className="muted-small">
+                      Los administradores no pueden tener unidad asignada.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-actions modal-footer-actions">
+              <button className="btn btn-admin-soft" onClick={closeEditUser}>
+                Cancelar
+              </button>
+              <button
+                className="btn btn-admin-primary"
+                onClick={handleSaveUserEdit}
+                disabled={savingUserEdit}
+              >
+                {savingUserEdit ? "Guardando..." : "Guardar cambios"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <AdminEditServiceModal
         isOpen={!!editingService}
         onClose={closeEditService}
@@ -1016,12 +1768,15 @@ function App() {
         setEditServiceTelefono={setEditServiceTelefono}
         editServiceGuardias={editServiceGuardias}
         setEditServiceGuardias={setEditServiceGuardias}
+        editServiceTurnoId={editServiceTurnoId}
+        setEditServiceTurnoId={setEditServiceTurnoId}
         editServiceActivo={editServiceActivo}
         setEditServiceActivo={setEditServiceActivo}
         editServiceFecha={editServiceFecha}
         setEditServiceFecha={setEditServiceFecha}
         savingServiceEdit={savingServiceEdit}
         handleSaveServiceEdit={handleSaveServiceEdit}
+        shifts={activeShifts}
       />
 
       <AdminDeleteServiceModal

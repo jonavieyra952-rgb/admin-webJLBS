@@ -1,5 +1,6 @@
 import React from "react";
 import AddressAutocomplete from "./AddressAutocomplete";
+import type { ShiftRow } from "../../types/admin";
 
 type Props = {
   newServiceNombre: string;
@@ -12,10 +13,11 @@ type Props = {
   setNewServiceTelefono: React.Dispatch<React.SetStateAction<string>>;
   newServiceGuardias: number;
   setNewServiceGuardias: React.Dispatch<React.SetStateAction<number>>;
-  newServiceActivo: number;
-  setNewServiceActivo: React.Dispatch<React.SetStateAction<number>>;
+  newServiceTurnoId: string;
+  setNewServiceTurnoId: React.Dispatch<React.SetStateAction<string>>;
   creatingService: boolean;
   handleCreateService: () => void;
+  shifts: ShiftRow[];
 };
 
 export default function AdminCreateServiceView({
@@ -29,11 +31,14 @@ export default function AdminCreateServiceView({
   setNewServiceTelefono,
   newServiceGuardias,
   setNewServiceGuardias,
-  newServiceActivo,
-  setNewServiceActivo,
+  newServiceTurnoId,
+  setNewServiceTurnoId,
   creatingService,
   handleCreateService,
+  shifts,
 }: Props) {
+  const activeShifts = shifts.filter((shift) => shift.activo === 1);
+
   return (
     <div className="row justify-content-center g-4">
       <div className="col-12 col-md-10 col-lg-8 col-xl-7">
@@ -94,21 +99,25 @@ export default function AdminCreateServiceView({
             </div>
 
             <div className="mb-3">
-              <label className="form-label">Estatus</label>
+              <label className="form-label">Turno</label>
               <select
                 className="form-select"
-                value={newServiceActivo}
-                onChange={(e) => setNewServiceActivo(Number(e.target.value))}
+                value={newServiceTurnoId}
+                onChange={(e) => setNewServiceTurnoId(e.target.value)}
               >
-                <option value={1}>Activo</option>
-                <option value={0}>Inactivo</option>
+                <option value="">Selecciona un turno</option>
+                {activeShifts.map((shift) => (
+                  <option key={shift.id} value={String(shift.id)}>
+                    {shift.nombre}
+                  </option>
+                ))}
               </select>
             </div>
 
             <button
               className="btn btn-primary w-100 mt-3"
               onClick={handleCreateService}
-              disabled={creatingService}
+              disabled={creatingService || !newServiceTurnoId}
             >
               {creatingService ? "Creando..." : "Crear servicio"}
             </button>

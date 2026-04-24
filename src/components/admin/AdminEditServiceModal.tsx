@@ -1,5 +1,7 @@
 import React from "react";
 import { X } from "lucide-react";
+import AddressAutocomplete from "./AddressAutocomplete";
+import type { ShiftRow } from "../../types/admin";
 
 type Props = {
   isOpen: boolean;
@@ -14,12 +16,15 @@ type Props = {
   setEditServiceTelefono: React.Dispatch<React.SetStateAction<string>>;
   editServiceGuardias: number;
   setEditServiceGuardias: React.Dispatch<React.SetStateAction<number>>;
+  editServiceTurnoId: string;
+  setEditServiceTurnoId: React.Dispatch<React.SetStateAction<string>>;
   editServiceActivo: number;
   setEditServiceActivo: React.Dispatch<React.SetStateAction<number>>;
   editServiceFecha: string;
   setEditServiceFecha: React.Dispatch<React.SetStateAction<string>>;
   savingServiceEdit: boolean;
   handleSaveServiceEdit: () => void;
+  shifts: ShiftRow[];
 };
 
 export default function AdminEditServiceModal({
@@ -35,14 +40,19 @@ export default function AdminEditServiceModal({
   setEditServiceTelefono,
   editServiceGuardias,
   setEditServiceGuardias,
+  editServiceTurnoId,
+  setEditServiceTurnoId,
   editServiceActivo,
   setEditServiceActivo,
   editServiceFecha,
   setEditServiceFecha,
   savingServiceEdit,
   handleSaveServiceEdit,
+  shifts,
 }: Props) {
   if (!isOpen) return null;
+
+  const activeShifts = shifts.filter((shift) => shift.activo === 1);
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -68,10 +78,11 @@ export default function AdminEditServiceModal({
 
           <div className="mb-3">
             <label className="form-label admin-label">Dirección</label>
-            <input
-              className="form-control admin-input"
+            <AddressAutocomplete
               value={editServiceDireccion}
-              onChange={(e) => setEditServiceDireccion(e.target.value)}
+              onChange={setEditServiceDireccion}
+              className="form-control admin-input"
+              placeholder="Escribe una dirección..."
             />
           </div>
 
@@ -105,6 +116,22 @@ export default function AdminEditServiceModal({
           </div>
 
           <div className="mb-3">
+            <label className="form-label admin-label">Turno</label>
+            <select
+              className="form-select admin-input"
+              value={editServiceTurnoId}
+              onChange={(e) => setEditServiceTurnoId(e.target.value)}
+            >
+              <option value="">Selecciona un turno</option>
+              {activeShifts.map((shift) => (
+                <option key={shift.id} value={String(shift.id)}>
+                  {shift.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="mb-3">
             <label className="form-label admin-label">Fecha de alta</label>
             <input
               type="date"
@@ -131,7 +158,7 @@ export default function AdminEditServiceModal({
           <button
             className="btn btn-admin-primary w-100"
             onClick={handleSaveServiceEdit}
-            disabled={savingServiceEdit || !editServiceNombre.trim()}
+            disabled={savingServiceEdit || !editServiceNombre.trim() || !editServiceTurnoId}
           >
             {savingServiceEdit ? "Guardando..." : "Guardar"}
           </button>
